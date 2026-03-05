@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "DataDrip",
-  "version": "1.1.1",
-  "description": "Scrape Google Maps search results from an in-page overlay and download them as CSV.",
+  "version": "1.2.0",
+  "description": "Premium, rapid Google Maps data extraction extension.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -36,6 +36,6 @@
   },
   "action": {
     "default_icon": "Logo.png",
-    "default_title": "DataDrip"
+    "default_title": "Google Maps Results Scraper"
   }
 }

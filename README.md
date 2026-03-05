@@ -1,8 +1,8 @@
-# DataDrip — Google Maps Scraper Extension
+# DataDrip — Premium Google Maps Scraper
 
 ![DataDrip Logo](Logo.png)
 
-**DataDrip** is a powerful Chrome extension that extracts business data directly from Google Maps search results and exports it instantly as a CSV file — no APIs, no subscriptions, no limits.
+**DataDrip** is a powerful, modern Chrome extension that extracts business data directly from Google Maps search results instantly. Featuring a sleek glassmorphism UI and lightning-fast extraction logic.
 
 ---
 

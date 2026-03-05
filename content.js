@@ -76,39 +76,43 @@
     root.id = OVERLAY_ID;
     root.innerHTML = `
       <div class="gmx-header">
-        <div>
+        <div class="gmx-logo-group">
           <div class="gmx-title">DataDrip</div>
-          <div class="gmx-subtitle">Fast Maps Scraper</div>
+          <div class="gmx-pulse"></div>
         </div>
         <div class="gmx-header-actions">
-          <button type="button" class="gmx-icon-btn" data-action="minimize">-</button>
-          <button type="button" class="gmx-icon-btn" data-action="hide">x</button>
+          <button type="button" class="gmx-icon-btn" data-action="minimize" title="Minimize">−</button>
+          <button type="button" class="gmx-icon-btn" data-action="hide" title="Close">×</button>
         </div>
       </div>
       <div class="gmx-body">
         <div class="gmx-stats">
-          <div class="gmx-stat">
-            <span>Status</span>
-            <strong data-role="status">Ready.</strong>
+          <div class="gmx-stat" title="Current Status">
+            <span class="gmx-stat-label">Status</span>
+            <div class="gmx-stat-value" data-role="status">Ready</div>
           </div>
-          <div class="gmx-stat">
-            <span>Extracted</span>
-            <strong data-role="extracted">0</strong>
-          </div>
-          <div class="gmx-stat">
-            <span>Total found</span>
-            <strong data-role="discovered">0</strong>
+          <div class="gmx-stat-grid">
+            <div class="gmx-stat" title="Extracted Places">
+              <span class="gmx-stat-label">Extracted</span>
+              <div class="gmx-stat-value" data-role="extracted">0</div>
+            </div>
+            <div class="gmx-stat" title="Total Discovered">
+              <span class="gmx-stat-label">Discovered</span>
+              <div class="gmx-stat-value" data-role="discovered">0</div>
+            </div>
           </div>
         </div>
         <div class="gmx-actions">
-          <button type="button" data-action="start">Start</button>
-          <button type="button" data-action="pause" class="gmx-secondary">Pause</button>
-          <button type="button" data-action="resume" class="gmx-secondary">Resume</button>
-          <button type="button" data-action="download" class="gmx-secondary">Download CSV</button>
-          <button type="button" data-action="reset" class="gmx-secondary">Reset</button>
+          <button type="button" data-action="start" class="gmx-btn-primary">Start</button>
+          <button type="button" data-action="download" class="gmx-btn-secondary">Download CSV</button>
+          <div class="gmx-action-row">
+            <button type="button" data-action="pause" class="gmx-btn-mini">Pause</button>
+            <button type="button" data-action="resume" class="gmx-btn-mini">Resume</button>
+            <button type="button" data-action="reset" class="gmx-btn-mini">Reset</button>
+          </div>
         </div>
         <div class="gmx-note" data-role="note">
-          Search on Google Maps, then press Start.
+          Ready to extract.
         </div>
       </div>
     `;
@@ -147,37 +151,40 @@
   function injectStyles() {
     const style = document.createElement("style");
     style.textContent = `
+      @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap');
+
       #${OVERLAY_ID} {
         position: fixed;
-        top: 88px;
+        top: 24px;
         right: 24px;
         width: 320px;
         z-index: 2147483647;
-        border: 1px solid rgba(255, 255, 255, 0.4);
-        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
         background: rgba(255, 255, 255, 0.85);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.05);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        color: #1a1a2e;
-        transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
-        transform-origin: top right;
-        opacity: 0;
-        animation: gmxFadeIn 0.4s forwards;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        font-family: 'Outfit', sans-serif;
+        color: #1a1f36;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+        animation: gmx-slide-in 0.5s ease-out;
       }
 
-      @keyframes gmxFadeIn {
-        from { opacity: 0; transform: translateY(-10px) scale(0.95); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
+      @keyframes gmx-slide-in {
+        from { transform: translateX(120%) scale(0.9); opacity: 0; }
+        to { transform: translateX(0) scale(1); opacity: 1; }
       }
 
       #${OVERLAY_ID}.gmx-minimized {
-        transform: scale(0.9);
+        width: 180px;
       }
 
       #${OVERLAY_ID}.gmx-minimized .gmx-body {
-        display: none;
+        max-height: 0;
+        padding: 0;
+        opacity: 0;
       }
 
       #${OVERLAY_ID} * {
@@ -188,148 +195,191 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 8px;
-        padding: 10px 14px;
+        padding: 12px 16px;
         cursor: move;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
         color: #ffffff;
-        border-radius: 12px 12px 0 0;
+        user-select: none;
+      }
+
+      #${OVERLAY_ID} .gmx-logo-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
 
       #${OVERLAY_ID} .gmx-title {
-        font-size: 14px;
+        font-size: 16px;
         font-weight: 700;
-        letter-spacing: 0.3px;
+        letter-spacing: -0.02em;
       }
 
-      #${OVERLAY_ID} .gmx-subtitle {
-        margin-top: 1px;
-        font-size: 10px;
-        opacity: 0.9;
+      #${OVERLAY_ID} .gmx-pulse {
+        width: 8px;
+        height: 8px;
+        background: #10b981;
+        border-radius: 50%;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        animation: gmx-pulse 2s infinite;
+      }
+
+      @keyframes gmx-pulse {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
       }
 
       #${OVERLAY_ID} .gmx-header-actions {
         display: flex;
-        gap: 6px;
-      }
-
-      #${OVERLAY_ID} .gmx-icon-btn,
-      #${OVERLAY_ID} .gmx-actions button {
-        border: 0;
-        border-radius: 8px;
-        font: inherit;
-        cursor: pointer;
-        transition: all 0.2s ease;
+        gap: 4px;
       }
 
       #${OVERLAY_ID} .gmx-icon-btn {
         width: 24px;
         height: 24px;
-        background: rgba(255, 255, 255, 0.2);
-        color: #ffffff;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 14px;
-        line-height: 1;
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
+        border-radius: 6px;
+        color: white;
+        cursor: pointer;
+        font-weight: bold;
+        transition: background 0.2s;
       }
 
       #${OVERLAY_ID} .gmx-icon-btn:hover {
         background: rgba(255, 255, 255, 0.3);
-        transform: scale(1.05);
       }
 
       #${OVERLAY_ID} .gmx-body {
-        padding: 12px;
+        padding: 14px;
+        transition: all 0.3s;
       }
 
       #${OVERLAY_ID} .gmx-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+
+      #${OVERLAY_ID} .gmx-stat-grid {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: 1fr 1fr;
         gap: 8px;
       }
 
       #${OVERLAY_ID} .gmx-stat {
-        padding: 8px;
-        border-radius: 8px;
-        background: rgba(241, 245, 249, 0.8);
-        border: 1px solid rgba(255, 255, 255, 0.5);
+        padding: 10px;
+        border-radius: 12px;
+        background: rgba(241, 245, 249, 0.6);
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        transition: transform 0.2s;
       }
 
-      #${OVERLAY_ID} .gmx-stat span {
-        display: block;
+      #${OVERLAY_ID} .gmx-stat:hover {
+        transform: translateY(-2px);
+      }
+
+      #${OVERLAY_ID} .gmx-stat-label {
         font-size: 10px;
-        color: #475569;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.05em;
+        color: #64748b;
         font-weight: 600;
+        margin-bottom: 2px;
+        display: block;
       }
 
-      #${OVERLAY_ID} .gmx-stat strong {
-        display: block;
-        margin-top: 4px;
-        font-size: 13px;
-        color: #0f172a;
-        line-height: 1.2;
+      #${OVERLAY_ID} .gmx-stat-value {
+        font-size: 14px;
+        font-weight: 700;
+        color: #1e293b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       #${OVERLAY_ID} .gmx-actions {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        display: flex;
+        flex-direction: column;
         gap: 8px;
-        margin-top: 10px;
       }
 
-      #${OVERLAY_ID} .gmx-actions button {
-        padding: 8px 10px;
-        font-size: 12px;
+      #${OVERLAY_ID} .gmx-action-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+
+      #${OVERLAY_ID} .gmx-btn-primary {
+        background: #4f46e5;
+        color: white;
+        border: none;
+        padding: 10px;
+        border-radius: 10px;
         font-weight: 600;
-        background: #2563eb;
-        color: #ffffff;
-        box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
       }
 
-      #${OVERLAY_ID} .gmx-actions button:hover:not(:disabled) {
+      #${OVERLAY_ID} .gmx-btn-primary:hover {
+        background: #4338ca;
         transform: translateY(-1px);
-        box-shadow: 0 4px 6px rgba(37, 99, 235, 0.3);
-        background: #1d4ed8;
+        box-shadow: 0 6px 16px rgba(79, 70, 229, 0.3);
       }
 
-      #${OVERLAY_ID} .gmx-actions button:active:not(:disabled) {
-        transform: translateY(0);
+      #${OVERLAY_ID} .gmx-btn-secondary {
+        background: #ffffff;
+        color: #4f46e5;
+        border: 1.5px solid #e0e7ff;
+        padding: 10px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
       }
 
-      #${OVERLAY_ID} .gmx-actions .gmx-secondary {
+      #${OVERLAY_ID} .gmx-btn-secondary:hover:not(:disabled) {
+        background: #f8faff;
+        border-color: #6366f1;
+      }
+
+      #${OVERLAY_ID} .gmx-btn-mini {
         background: #f1f5f9;
-        color: #334155;
-        box-shadow: none;
-        border: 1px solid #e2e8f0;
+        color: #475569;
+        border: none;
+        padding: 8px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
       }
 
-      #${OVERLAY_ID} .gmx-actions .gmx-secondary:hover:not(:disabled) {
+      #${OVERLAY_ID} .gmx-btn-mini:hover:not(:disabled) {
         background: #e2e8f0;
-        color: #0f172a;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        color: #1e293b;
       }
 
-      #${OVERLAY_ID} .gmx-actions button:disabled {
+      #${OVERLAY_ID} button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
+        filter: grayscale(1);
       }
 
       #${OVERLAY_ID} .gmx-note {
-        margin-top: 10px;
-        padding: 8px 10px;
-        border-radius: 8px;
-        background: rgba(248, 250, 252, 0.9);
-        border: 1px dashed #cbd5e1;
+        margin-top: 12px;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: rgba(241, 245, 249, 0.4);
         color: #64748b;
         font-size: 11px;
         line-height: 1.4;
-        text-align: center;
+        border-left: 3px solid #6366f1;
       }
     `;
 
