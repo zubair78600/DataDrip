@@ -88,27 +88,70 @@
         </div>
       </div>
       <div id="gmx-settings-panel" class="gmx-settings-panel">
-        <div class="gmx-settings-header">
-          <span>Column Selection</span>
+        <div class="gmx-settings-view active" data-view="menu">
+          <div class="gmx-settings-header">
+            <span>Settings</span>
+          </div>
+          <div class="gmx-menu-list">
+            <button type="button" class="gmx-menu-item" data-nav="csv">
+              <span>CSV Format</span>
+              <span class="gmx-chevron">›</span>
+            </button>
+            <button type="button" class="gmx-menu-item" data-nav="about">
+              <span>About</span>
+              <span class="gmx-chevron">›</span>
+            </button>
+          </div>
+          <button type="button" class="gmx-settings-done" data-action="settings-done">Close</button>
+        </div>
+
+        <div class="gmx-settings-view" data-view="csv">
+          <div class="gmx-settings-header">
+            <button type="button" class="gmx-back-btn" data-nav="menu">‹ Back</button>
+            <span>CSV Columns</span>
+          </div>
           <div class="gmx-settings-bulk">
             <button type="button" data-action="select-all">All</button>
             <button type="button" data-action="select-none">None</button>
           </div>
+          <div class="gmx-settings-list">
+            ${CSV_COLUMNS.map(col => `
+              <label class="gmx-col-toggle">
+                <input type="checkbox" value="${col.key}" ${state.selectedColumns.has(col.key) ? 'checked' : ''}>
+                <span>${col.label}</span>
+              </label>
+            `).join('')}
+          </div>
         </div>
-        <div class="gmx-settings-list">
-          ${CSV_COLUMNS.map(col => `
-            <label class="gmx-col-toggle">
-              <input type="checkbox" value="${col.key}" ${state.selectedColumns.has(col.key) ? 'checked' : ''}>
-              <span>${col.label}</span>
-            </label>
-          `).join('')}
+
+        <div class="gmx-settings-view" data-view="about">
+          <div class="gmx-settings-header">
+            <button type="button" class="gmx-back-btn" data-nav="menu">‹ Back</button>
+            <span>About</span>
+          </div>
+          <div class="gmx-about-content">
+            <div class="gmx-about-logo">DataDrip</div>
+            <div class="gmx-about-version">Version 1.3.0</div>
+            <div class="gmx-about-info">
+              <p>Premium Google Maps data extraction utility.</p>
+              <div class="gmx-credit">
+                <strong>Build by Zubair</strong><br>
+                <span>zubair78600@gmail.com</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <button type="button" class="gmx-settings-close" data-action="settings-done">Save & Close</button>
       </div>
       <div class="gmx-body">
         <div class="gmx-stats">
           <div class="gmx-stat" title="Current Status">
-            <span class="gmx-stat-label">Status</span>
+            <div class="gmx-stat-header-row">
+              <span class="gmx-stat-label">Status</span>
+              <div class="gmx-limit-inline" title="Extraction Limit">
+                <span>Limit:</span>
+                <input type="number" data-role="limit" placeholder="∞" min="1" step="1">
+              </div>
+            </div>
             <div class="gmx-stat-value" data-role="status">Ready</div>
           </div>
           <div class="gmx-stat-grid">
@@ -120,10 +163,6 @@
               <span class="gmx-stat-label">Discovered</span>
               <div class="gmx-stat-value" data-role="discovered">0</div>
             </div>
-          </div>
-          <div class="gmx-limit-box">
-            <span class="gmx-stat-label">Extraction Limit</span>
-            <input type="number" data-role="limit" placeholder="No limit" min="1" step="1">
           </div>
         </div>
         <div class="gmx-actions">
@@ -168,11 +207,24 @@
 
     elements.settings.addEventListener("click", () => {
       elements.settingsPanel.classList.add("active");
+      showSettingsView("menu");
     });
 
     elements.settingsDone.addEventListener("click", () => {
       elements.settingsPanel.classList.remove("active");
     });
+
+    root.querySelectorAll("[data-nav]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        showSettingsView(btn.getAttribute("data-nav"));
+      });
+    });
+
+    function showSettingsView(viewName) {
+      root.querySelectorAll(".gmx-settings-view").forEach(v => {
+        v.classList.toggle("active", v.getAttribute("data-view") === viewName);
+      });
+    }
 
     elements.selectAll.addEventListener("click", () => {
       const checks = elements.settingsPanel.querySelectorAll('input[type="checkbox"]');
@@ -350,14 +402,38 @@
         transform: translateY(-2px);
       }
 
-      #${OVERLAY_ID} .gmx-stat-label {
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #64748b;
-        font-weight: 600;
+      #${OVERLAY_ID} .gmx-stat-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         margin-bottom: 2px;
-        display: block;
+      }
+
+      #${OVERLAY_ID} .gmx-limit-inline {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 10px;
+        color: #4f46e5;
+        font-weight: 700;
+        background: rgba(99, 102, 241, 0.1);
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+
+      #${OVERLAY_ID} .gmx-limit-inline input {
+        width: 32px;
+        border: none;
+        background: transparent;
+        padding: 0;
+        font: inherit;
+        color: inherit;
+        outline: none;
+        text-align: center;
+      }
+
+      #${OVERLAY_ID} .gmx-limit-inline input::placeholder {
+        color: rgba(79, 70, 229, 0.4);
       }
 
       #${OVERLAY_ID} .gmx-stat-value {
@@ -367,34 +443,6 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-      }
-
-      #${OVERLAY_ID} .gmx-limit-box {
-        margin-top: 8px;
-        padding: 10px;
-        border-radius: 12px;
-        background: rgba(99, 102, 241, 0.05);
-        border: 1px dashed rgba(99, 102, 241, 0.3);
-      }
-
-      #${OVERLAY_ID} .gmx-limit-box input {
-        width: 100%;
-        margin-top: 4px;
-        padding: 6px 10px;
-        border: 1px solid #e0e7ff;
-        border-radius: 8px;
-        font-family: inherit;
-        font-size: 13px;
-        font-weight: 600;
-        color: #4f46e5;
-        background: white;
-        outline: none;
-        transition: border-color 0.2s;
-      }
-
-      #${OVERLAY_ID} .gmx-limit-box input:focus {
-        border-color: #6366f1;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
       }
 
       #${OVERLAY_ID} .gmx-actions {
@@ -477,38 +525,73 @@
         border-left: 3px solid #6366f1;
       }
 
-      #${OVERLAY_ID} .gmx-settings-panel {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.98);
-        z-index: 100;
-        transform: translateY(100%);
-        transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-        display: flex;
+      #${OVERLAY_ID} .gmx-settings-view {
+        display: none;
         flex-direction: column;
-        padding: 16px;
+        height: 100%;
       }
 
-      #${OVERLAY_ID} .gmx-settings-panel.active {
-        transform: translateY(0);
+      #${OVERLAY_ID} .gmx-settings-view.active {
+        display: flex;
       }
 
       #${OVERLAY_ID} .gmx-settings-header {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        margin-bottom: 12px;
+        gap: 12px;
+        margin-bottom: 16px;
         font-weight: 700;
-        color: #4f46e5;
+        color: #1e293b;
         font-size: 15px;
+      }
+
+      #${OVERLAY_ID} .gmx-back-btn {
+        background: #f1f5f9;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #64748b;
+        cursor: pointer;
+      }
+
+      #${OVERLAY_ID} .gmx-menu-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1;
+      }
+
+      #${OVERLAY_ID} .gmx-menu-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        color: #1e293b;
+        text-align: left;
+      }
+
+      #${OVERLAY_ID} .gmx-menu-item:hover {
+        background: #f1f5f9;
+        border-color: #6366f1;
+      }
+
+      #${OVERLAY_ID} .gmx-chevron {
+        color: #6366f1;
+        font-size: 16px;
       }
 
       #${OVERLAY_ID} .gmx-settings-bulk {
         display: flex;
         gap: 8px;
+        margin-bottom: 10px;
       }
 
       #${OVERLAY_ID} .gmx-settings-bulk button {
@@ -524,8 +607,8 @@
       #${OVERLAY_ID} .gmx-settings-list {
         flex: 1;
         overflow-y: auto;
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 6px;
         margin-bottom: 12px;
         padding-right: 4px;
@@ -534,13 +617,13 @@
       #${OVERLAY_ID} .gmx-col-toggle {
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 8px 12px;
+        gap: 6px;
+        padding: 6px 8px;
         background: #f8fafc;
-        border-radius: 10px;
+        border-radius: 8px;
         cursor: pointer;
         transition: background 0.2s;
-        font-size: 13px;
+        font-size: 11px;
         font-weight: 600;
       }
 
@@ -549,13 +632,58 @@
       }
 
       #${OVERLAY_ID} .gmx-col-toggle input {
-        width: 16px;
-        height: 16px;
+        width: 14px;
+        height: 14px;
         accent-color: #6366f1;
         cursor: pointer;
       }
 
-      #${OVERLAY_ID} .gmx-settings-close {
+      #${OVERLAY_ID} .gmx-about-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 12px;
+      }
+
+      #${OVERLAY_ID} .gmx-about-logo {
+        font-size: 24px;
+        font-weight: 800;
+        color: #4f46e5;
+        letter-spacing: -0.04em;
+      }
+
+      #${OVERLAY_ID} .gmx-about-version {
+        font-size: 11px;
+        background: #e0e7ff;
+        color: #4338ca;
+        padding: 2px 8px;
+        border-radius: 100px;
+        font-weight: 700;
+      }
+
+      #${OVERLAY_ID} .gmx-about-info {
+        font-size: 12px;
+        color: #64748b;
+        line-height: 1.5;
+      }
+
+      #${OVERLAY_ID} .gmx-credit {
+        margin-top: 16px;
+        padding: 12px;
+        background: #f1f5f9;
+        border-radius: 12px;
+        width: 100%;
+      }
+
+      #${OVERLAY_ID} .gmx-credit strong {
+        color: #1e293b;
+        font-size: 13px;
+      }
+
+      #${OVERLAY_ID} .gmx-settings-done {
         background: #6366f1;
         color: white;
         border: none;
@@ -564,6 +692,7 @@
         font-weight: 600;
         cursor: pointer;
         box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        width: 100%;
       }
     `;
 
@@ -1907,11 +2036,7 @@
       return "Enter a Google Maps search so the results list appears, then press Start.";
     }
 
-    if (state.queue.length && state.processingIndex >= state.queue.length) {
-      return "Run complete. Press Download CSV, or Reset to start over.";
-    }
-
-    return "Single overlay mode is ready. Press Start to extract the loaded Google Maps results.";
+    return "";
   }
 
   function getIdleStatus() {
