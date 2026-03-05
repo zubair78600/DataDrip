@@ -50,6 +50,7 @@
     status: "Enter a Google Maps search to begin.",
     extractedTotal: 0,
     discoveredTotal: 0,
+    limit: null,
     lastUrl: window.location.href,
     searchQuery: getSearchQuery(window.location.href)
   };
@@ -101,6 +102,10 @@
               <div class="gmx-stat-value" data-role="discovered">0</div>
             </div>
           </div>
+          <div class="gmx-limit-box">
+            <span class="gmx-stat-label">Extraction Limit</span>
+            <input type="number" data-role="limit" placeholder="No limit" min="1" step="1">
+          </div>
         </div>
         <div class="gmx-actions">
           <button type="button" data-action="start" class="gmx-btn-primary">Start</button>
@@ -129,8 +134,14 @@
       download: root.querySelector('[data-action="download"]'),
       reset: root.querySelector('[data-action="reset"]'),
       minimize: root.querySelector('[data-action="minimize"]'),
-      hide: root.querySelector('[data-action="hide"]')
+      hide: root.querySelector('[data-action="hide"]'),
+      limit: root.querySelector('[data-role="limit"]')
     };
+
+    elements.limit.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      state.limit = (!isNaN(val) && val > 0) ? val : null;
+    });
 
     elements.start.addEventListener("click", startScraping);
     elements.pause.addEventListener("click", pauseScraping);
@@ -305,6 +316,34 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+
+      #${OVERLAY_ID} .gmx-limit-box {
+        margin-top: 8px;
+        padding: 10px;
+        border-radius: 12px;
+        background: rgba(99, 102, 241, 0.05);
+        border: 1px dashed rgba(99, 102, 241, 0.3);
+      }
+
+      #${OVERLAY_ID} .gmx-limit-box input {
+        width: 100%;
+        margin-top: 4px;
+        padding: 6px 10px;
+        border: 1px solid #e0e7ff;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: #4f46e5;
+        background: white;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      #${OVERLAY_ID} .gmx-limit-box input:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
       }
 
       #${OVERLAY_ID} .gmx-actions {
@@ -529,6 +568,10 @@
     while (state.runToken === runToken) {
       await waitWhilePaused(runToken);
 
+      if (state.limit && state.rowsMap.size >= state.limit) {
+        break;
+      }
+
       const currentHeight = container.scrollHeight;
       const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 6;
 
@@ -571,6 +614,8 @@
     const anchors = Array.from(container.querySelectorAll('a[href*="/maps/place/"]'));
 
     for (const anchor of anchors) {
+      if (state.limit && state.rowsMap.size >= state.limit) break;
+
       const listingUrl = sanitizeUrl(anchor.href || "");
       if (!listingUrl) continue;
 
@@ -802,6 +847,10 @@
     state.pendingStart = false;
     state.extractedTotal = 0;
     state.discoveredTotal = 0;
+    if (overlay && overlay.limit) {
+      overlay.limit.value = "";
+      state.limit = null;
+    }
     state.status = getIdleStatus();
     render();
   }

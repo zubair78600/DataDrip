@@ -9,6 +9,7 @@
 ## ✨ Features
 
 - ⚡ **Rapid Extraction** — Works by scraping sidebar cards as it scrolls, extracting 20+ results per second
+- 🎯 **Extraction Limit** — Set a custom limit to stop automatically (e.g., first 20 results)
 - 📋 **Rich Data Fields** — Captures Name, Address, Phone, Website, Categories, Rating, Review Count, Lat/Lng, Place ID, and more
 - 📥 **One-Click CSV Export** — Clean, formatted CSV ready to open in Excel or Google Sheets
 - ⏸️ **Pause & Resume** — Pause at any time and continue later without losing progress
