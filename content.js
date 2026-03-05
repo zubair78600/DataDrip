@@ -51,6 +51,7 @@
     extractedTotal: 0,
     discoveredTotal: 0,
     limit: null,
+    selectedColumns: new Set(CSV_COLUMNS.map(c => c.key)),
     lastUrl: window.location.href,
     searchQuery: getSearchQuery(window.location.href)
   };
@@ -82,9 +83,27 @@
           <div class="gmx-pulse"></div>
         </div>
         <div class="gmx-header-actions">
-          <button type="button" class="gmx-icon-btn" data-action="minimize" title="Minimize">−</button>
+          <button type="button" class="gmx-icon-btn" data-action="settings" title="Settings">⚙</button>
           <button type="button" class="gmx-icon-btn" data-action="hide" title="Close">×</button>
         </div>
+      </div>
+      <div id="gmx-settings-panel" class="gmx-settings-panel">
+        <div class="gmx-settings-header">
+          <span>Column Selection</span>
+          <div class="gmx-settings-bulk">
+            <button type="button" data-action="select-all">All</button>
+            <button type="button" data-action="select-none">None</button>
+          </div>
+        </div>
+        <div class="gmx-settings-list">
+          ${CSV_COLUMNS.map(col => `
+            <label class="gmx-col-toggle">
+              <input type="checkbox" value="${col.key}" ${state.selectedColumns.has(col.key) ? 'checked' : ''}>
+              <span>${col.label}</span>
+            </label>
+          `).join('')}
+        </div>
+        <button type="button" class="gmx-settings-close" data-action="settings-done">Save & Close</button>
       </div>
       <div class="gmx-body">
         <div class="gmx-stats">
@@ -133,9 +152,13 @@
       resume: root.querySelector('[data-action="resume"]'),
       download: root.querySelector('[data-action="download"]'),
       reset: root.querySelector('[data-action="reset"]'),
-      minimize: root.querySelector('[data-action="minimize"]'),
+      settings: root.querySelector('[data-action="settings"]'),
       hide: root.querySelector('[data-action="hide"]'),
-      limit: root.querySelector('[data-role="limit"]')
+      limit: root.querySelector('[data-role="limit"]'),
+      settingsPanel: root.querySelector('#gmx-settings-panel'),
+      settingsDone: root.querySelector('[data-action="settings-done"]'),
+      selectAll: root.querySelector('[data-action="select-all"]'),
+      selectNone: root.querySelector('[data-action="select-none"]')
     };
 
     elements.limit.addEventListener("input", (e) => {
@@ -143,14 +166,42 @@
       state.limit = (!isNaN(val) && val > 0) ? val : null;
     });
 
+    elements.settings.addEventListener("click", () => {
+      elements.settingsPanel.classList.add("active");
+    });
+
+    elements.settingsDone.addEventListener("click", () => {
+      elements.settingsPanel.classList.remove("active");
+    });
+
+    elements.selectAll.addEventListener("click", () => {
+      const checks = elements.settingsPanel.querySelectorAll('input[type="checkbox"]');
+      checks.forEach(c => {
+        c.checked = true;
+        state.selectedColumns.add(c.value);
+      });
+    });
+
+    elements.selectNone.addEventListener("click", () => {
+      const checks = elements.settingsPanel.querySelectorAll('input[type="checkbox"]');
+      checks.forEach(c => {
+        c.checked = false;
+        state.selectedColumns.delete(c.value);
+      });
+    });
+
+    elements.settingsPanel.addEventListener("change", (e) => {
+      if (e.target.tagName === "INPUT") {
+        if (e.target.checked) state.selectedColumns.add(e.target.value);
+        else state.selectedColumns.delete(e.target.value);
+      }
+    });
+
     elements.start.addEventListener("click", startScraping);
     elements.pause.addEventListener("click", pauseScraping);
     elements.resume.addEventListener("click", resumeScraping);
     elements.download.addEventListener("click", downloadCsv);
     elements.reset.addEventListener("click", resetScraper);
-    elements.minimize.addEventListener("click", () => {
-      root.classList.toggle("gmx-minimized");
-    });
     elements.hide.addEventListener("click", () => {
       root.style.display = "none";
     });
@@ -424,6 +475,95 @@
         font-size: 11px;
         line-height: 1.4;
         border-left: 3px solid #6366f1;
+      }
+
+      #${OVERLAY_ID} .gmx-settings-panel {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.98);
+        z-index: 100;
+        transform: translateY(100%);
+        transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+      }
+
+      #${OVERLAY_ID} .gmx-settings-panel.active {
+        transform: translateY(0);
+      }
+
+      #${OVERLAY_ID} .gmx-settings-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        font-weight: 700;
+        color: #4f46e5;
+        font-size: 15px;
+      }
+
+      #${OVERLAY_ID} .gmx-settings-bulk {
+        display: flex;
+        gap: 8px;
+      }
+
+      #${OVERLAY_ID} .gmx-settings-bulk button {
+        background: none;
+        border: 1px solid #e2e8f0;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        cursor: pointer;
+        color: #64748b;
+      }
+
+      #${OVERLAY_ID} .gmx-settings-list {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 12px;
+        padding-right: 4px;
+      }
+
+      #${OVERLAY_ID} .gmx-col-toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        background: #f8fafc;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 0.2s;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      #${OVERLAY_ID} .gmx-col-toggle:hover {
+        background: #f1f5f9;
+      }
+
+      #${OVERLAY_ID} .gmx-col-toggle input {
+        width: 16px;
+        height: 16px;
+        accent-color: #6366f1;
+        cursor: pointer;
+      }
+
+      #${OVERLAY_ID} .gmx-settings-close {
+        background: #6366f1;
+        color: white;
+        border: none;
+        padding: 10px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
       }
     `;
 
@@ -847,8 +987,15 @@
     state.pendingStart = false;
     state.extractedTotal = 0;
     state.discoveredTotal = 0;
-    if (overlay && overlay.limit) {
-      overlay.limit.value = "";
+    if (overlay) {
+      if (overlay.limit) overlay.limit.value = "";
+      if (overlay.settingsPanel) {
+        const checks = overlay.settingsPanel.querySelectorAll('input[type="checkbox"]');
+        checks.forEach(c => {
+          c.checked = true;
+          state.selectedColumns.add(c.value);
+        });
+      }
       state.limit = null;
     }
     state.status = getIdleStatus();
@@ -1710,9 +1857,10 @@
   }
 
   function convertRowsToCsv(rows) {
-    const headerRow = CSV_COLUMNS.map((column) => column.label).join(",");
+    const selectedColumns = CSV_COLUMNS.filter((col) => state.selectedColumns.has(col.key));
+    const headerRow = selectedColumns.map((column) => column.label).join(",");
     const dataRows = rows.map((row) =>
-      CSV_COLUMNS.map((column) => escapeCsvValue(row[column.key] ?? "")).join(",")
+      selectedColumns.map((column) => escapeCsvValue(row[column.key] ?? "")).join(",")
     );
 
     return `\uFEFF${[headerRow, ...dataRows].join("\n")}`;
