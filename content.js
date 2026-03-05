@@ -177,6 +177,11 @@
         to { transform: translateX(0) scale(1); opacity: 1; }
       }
 
+      #${OVERLAY_ID}.gmx-dragging {
+        transition: none !important;
+        cursor: grabbing !important;
+      }
+
       #${OVERLAY_ID}.gmx-minimized {
         width: 180px;
       }
@@ -402,23 +407,32 @@
         top: rect.top
       };
 
+      target.classList.add("gmx-dragging");
       target.style.right = "auto";
       event.preventDefault();
     });
 
     window.addEventListener("mousemove", (event) => {
-      if (!dragState) {
-        return;
-      }
+      if (!dragState) return;
 
-      const nextLeft = Math.max(8, dragState.left + (event.clientX - dragState.startX));
-      const nextTop = Math.max(8, dragState.top + (event.clientY - dragState.startY));
-      target.style.left = `${nextLeft}px`;
-      target.style.top = `${nextTop}px`;
+      const deltaX = event.clientX - dragState.startX;
+      const deltaY = event.clientY - dragState.startY;
+
+      const nextLeft = Math.max(8, dragState.left + deltaX);
+      const nextTop = Math.max(8, dragState.top + deltaY);
+
+      requestAnimationFrame(() => {
+        if (!dragState) return;
+        target.style.left = `${nextLeft}px`;
+        target.style.top = `${nextTop}px`;
+      });
     });
 
     window.addEventListener("mouseup", () => {
-      dragState = null;
+      if (dragState) {
+        target.classList.remove("gmx-dragging");
+        dragState = null;
+      }
     });
   }
 
