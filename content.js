@@ -964,6 +964,23 @@
         }
       }
 
+      // Check aria-labels for Phone and Website if still missing
+      if (!website) {
+        const websiteAria = card.querySelector('a[aria-label*="Website"], a[href*="website"]');
+        if (websiteAria?.href && !/google\./i.test(websiteAria.href)) {
+          website = websiteAria.href;
+        }
+      }
+
+      if (phone.length < 5) {
+        const phoneAria = card.querySelector('button[aria-label*="Phone"], button[aria-label*="Call"]');
+        if (phoneAria) {
+          const ariaText = phoneAria.getAttribute("aria-label") || "";
+          const phoneInAria = ariaText.match(/[\d\s\-()]{10,}/);
+          if (phoneInAria) phone = phoneInAria[0].trim();
+        }
+      }
+
       const img = card.querySelector("img[src*='googleusercontent.com'], img[src*='gstatic.com']");
       const featuredImage = sanitizeUrl(img ? img.src : "");
 
@@ -1061,11 +1078,30 @@
   function parsePlaceNode(node, title, placeId) {
     const nodeStr = JSON.stringify(node);
 
-    const phoneMatch = nodeStr.match(/"((\+\d{1,3}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4})"/);
-    const phone = phoneMatch ? phoneMatch[1] : "";
+    // Deep Phone Scan: Look for any string containing 10+ digits
+    const phoneCandidates = nodeStr.match(/"(\+?[\d\s\-()]{10,20})"/g) || [];
+    let phone = "";
+    let allPhones = [];
+    for (const cand of phoneCandidates) {
+      const clean = cand.replace(/"/g, "").trim();
+      const digits = clean.replace(/\D/g, "");
+      if (digits.length >= 10 && digits.length <= 15) {
+        if (!phone) phone = clean;
+        allPhones.push(clean);
+      }
+    }
+    const phones = [...new Set(allPhones)].join(", ");
 
-    const websiteMatch = nodeStr.match(/"(https?:\/\/(?!www\.google|policies\.google\.com|schema\.org)[^"]+)"/);
-    const website = websiteMatch ? websiteMatch[1].replace(/\\/g, "") : "";
+    // Deep Website Scan: Find any URL that isn't Google or metadata
+    const urlCandidates = nodeStr.match(/"(https?:\/\/[^"]+)"/g) || [];
+    let website = "";
+    for (const cand of urlCandidates) {
+      const url = cand.replace(/"/g, "").replace(/\\/g, "");
+      if (!/google\.|gstatic\.|policies\.|schema\.org/i.test(url)) {
+        website = url;
+        break;
+      }
+    }
 
     // Opening Hours Search in JSON
     let openingHours = "";
@@ -1097,7 +1133,7 @@
         time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
         amenities: "",
         phone: phone,
-        phones: phone,
+        phones: phones,
         claimed: "",
         review_count: reviews,
         average_rating: rating,
