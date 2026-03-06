@@ -969,6 +969,14 @@
 
       const addressParts = splitAddress(address);
 
+      let openingHours = "";
+      for (const line of lines) {
+        if (/^Open\s*(\xb7|24\s*hours)|Closed\s*\xb7/i.test(line)) {
+          openingHours = line;
+          break;
+        }
+      }
+
       state.rowsMap.set(key, {
         name: name,
         description: "",
@@ -989,7 +997,7 @@
         longitude: identifiers.longitude,
         website: website,
         domain: safeUrlDomain(website),
-        opening_hours: "",
+        opening_hours: openingHours,
         featured_image: featuredImage,
         cid: identifiers.cid,
         fid: identifiers.fid,
@@ -1056,8 +1064,18 @@
     const phoneMatch = nodeStr.match(/"((\+\d{1,3}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4})"/);
     const phone = phoneMatch ? phoneMatch[1] : "";
 
-    const websiteMatch = nodeStr.match(/"(https?:\/\/(?!www\.google|policies\.google\.com)[^"]+)"/);
+    const websiteMatch = nodeStr.match(/"(https?:\/\/(?!www\.google|policies\.google\.com|schema\.org)[^"]+)"/);
     const website = websiteMatch ? websiteMatch[1].replace(/\\/g, "") : "";
+
+    // Opening Hours Search in JSON
+    let openingHours = "";
+    const hoursMatch = nodeStr.match(/"(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday): [^"]+"/g);
+    if (hoursMatch) {
+      openingHours = hoursMatch.map(h => h.replace(/"/g, "")).join(", ");
+    } else {
+      const openNowMatch = nodeStr.match(/"(Open [^"]+)"|"(Closed [^"]+)"/);
+      if (openNowMatch) openingHours = openNowMatch[1] || openNowMatch[2];
+    }
 
     const ratingMatch = nodeStr.match(/\[(\d\.\d),(\d+)\]/);
     const rating = ratingMatch ? ratingMatch[1] : "";
@@ -1083,13 +1101,13 @@
         claimed: "",
         review_count: reviews,
         average_rating: rating,
-        review_url: "https://search.google.com/local/reviews?placeid=" + placeId,
+        review_url: placeId ? "https://search.google.com/local/reviews?placeid=" + placeId : "",
         google_maps_url: "https://www.google.com/maps/place/?q=place_id:" + placeId,
         latitude: lat,
         longitude: lng,
         website: website,
         domain: safeUrlDomain(website),
-        opening_hours: "",
+        opening_hours: openingHours,
         featured_image: "",
         cid: "",
         fid: "",
@@ -1605,8 +1623,15 @@
       return authority.href;
     }
 
+    // Check aria-labels
+    const websiteAria = document.querySelector('a[aria-label*="Website:"], a[aria-label="Website"], a[href*="website"]');
+    if (websiteAria?.href && !/google\./i.test(websiteAria.href)) {
+      return websiteAria.href;
+    }
+
     const link = Array.from(document.querySelectorAll("a[href^='http']"))
-      .find((anchor) => !/google\./i.test(anchor.href));
+      .filter(a => !/google\./i.test(a.href) && !/schema\.org/i.test(a.href))
+      .find(a => a.innerText.length > 5 || a.href.length > 10);
     return link?.href || "";
   }
 
@@ -1808,7 +1833,8 @@
     const fidMatch = combined.match(/(0x[0-9a-f]+:0x[0-9a-f]+)/i);
     const placeIdMatch =
       combined.match(/placeid=([A-Za-z0-9_-]+)/i) ||
-      combined.match(/1s(ChI[A-Za-z0-9_-]+)/);
+      combined.match(/1s(ChI[A-Za-z0-9_-]+)/) ||
+      combined.match(/!1s(0x[0-9a-f]+:0x[0-9a-f]+)/i); // Sometimes FID is passed as 1s in some URLs
 
     let cid = "";
     if (fidMatch?.[1]) {
