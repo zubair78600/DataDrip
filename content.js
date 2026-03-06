@@ -826,12 +826,108 @@
 
     try {
       await rapidScrollAndExtract(runToken);
+
+      // Phase 2: Detail enrichment — click into each place to get phone/website
+      if (state.isRunning && state.runToken === runToken) {
+        await enrichWithDetails(runToken);
+      }
     } catch (error) {
       state.isRunning = false;
       state.status = error.message || "Scrape failed.";
       render();
       console.error("[Overlay] Scrape failed:", error);
     }
+  }
+
+  async function enrichWithDetails(runToken) {
+    const entries = Array.from(state.rowsMap.entries());
+    const needsEnrichment = entries.filter(([_key, row]) => !row.phone && !row.website);
+
+    if (needsEnrichment.length === 0) {
+      state.isRunning = false;
+      state.status = `Completed. ${state.rowsMap.size} rows extracted.`;
+      render();
+      return;
+    }
+
+    console.log(`[Overlay] Enriching ${needsEnrichment.length} places with detail data...`);
+
+    let enriched = 0;
+    for (const [key, row] of needsEnrichment) {
+      if (state.runToken !== runToken) return;
+      await waitWhilePaused(runToken);
+
+      if (state.limit && enriched >= state.limit) break;
+
+      const summary = {
+        key,
+        name: row.name,
+        listing_url: row.google_maps_url || ""
+      };
+
+      state.status = `Enriching ${enriched + 1}/${needsEnrichment.length}: ${row.name}`;
+      render();
+
+      try {
+        await ensureResultsView();
+        const listingTarget = await findAndRevealListingTarget(summary, runToken);
+
+        if (!listingTarget) {
+          console.warn("[Overlay] Could not find listing for enrichment:", row.name);
+          continue;
+        }
+
+        const opened = await openListingDetail(summary, listingTarget);
+        if (!opened) {
+          console.warn("[Overlay] Could not open detail for enrichment:", row.name);
+          continue;
+        }
+
+        await wait(DETAIL_WAIT_MS);
+
+        const detailTitle = getPlaceTitle();
+        if (!detailTitle || detailTitle === "Results" || !findBackButton()) {
+          continue;
+        }
+
+        // Enrich only the missing fields, keep existing data
+        const detail = scrapePlaceDetail(summary);
+        const existing = state.rowsMap.get(key);
+        if (existing) {
+          if (!existing.phone && detail.phone) existing.phone = detail.phone;
+          if (!existing.phones && detail.phones) existing.phones = detail.phones;
+          if (!existing.website && detail.website) existing.website = detail.website;
+          if (!existing.domain && detail.domain) existing.domain = detail.domain;
+          if (!existing.opening_hours && detail.opening_hours) existing.opening_hours = detail.opening_hours;
+          if (!existing.fulladdress && detail.fulladdress) existing.fulladdress = detail.fulladdress;
+          if (!existing.street && detail.street) existing.street = detail.street;
+          if (!existing.municipality && detail.municipality) existing.municipality = detail.municipality;
+          if (!existing.categories && detail.categories) existing.categories = detail.categories;
+          if (!existing.review_url && detail.review_url) existing.review_url = detail.review_url;
+          if (!existing.place_id && detail.place_id) existing.place_id = detail.place_id;
+          if (!existing.featured_image && detail.featured_image) existing.featured_image = detail.featured_image;
+          if (!existing.cid && detail.cid) existing.cid = detail.cid;
+          if (!existing.fid && detail.fid) existing.fid = detail.fid;
+          state.rowsMap.set(key, existing);
+        }
+
+        enriched++;
+        render();
+      } catch (error) {
+        console.warn("[Overlay] Enrichment failed for:", row.name, error);
+      } finally {
+        try {
+          await navigateBackToResults();
+        } catch (navErr) {
+          console.warn("[Overlay] Failed to return to results:", navErr);
+        }
+      }
+    }
+
+    state.isRunning = false;
+    state.isPaused = false;
+    state.status = `Completed. ${state.rowsMap.size} rows extracted (${enriched} enriched).`;
+    render();
   }
 
   async function rapidScrollAndExtract(runToken) {
@@ -890,9 +986,8 @@
     await wait(100);
     scrapeVisibleCards(container);
 
-    state.isRunning = false;
-    state.isPaused = false;
-    state.status = "Completed. " + state.rowsMap.size + " rows extracted.";
+    // Don't set isRunning=false here — enrichment pass follows
+    state.status = `Discovered ${state.rowsMap.size} places. Enriching with details...`;
     render();
   }
 
