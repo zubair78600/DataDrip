@@ -174,9 +174,7 @@
             <button type="button" data-action="reset" class="gmx-btn-mini">Reset</button>
           </div>
         </div>
-        <div class="gmx-note" data-role="note">
-          Ready to extract.
-        </div>
+        <div class="gmx-note" data-role="note"></div>
       </div>
     `;
 
@@ -206,8 +204,8 @@
     });
 
     elements.settings.addEventListener("click", () => {
-      elements.settingsPanel.classList.add("active");
-      showSettingsView("menu");
+      const isActive = elements.settingsPanel.classList.toggle("active");
+      if (isActive) showSettingsView("menu");
     });
 
     elements.settingsDone.addEventListener("click", () => {
@@ -506,6 +504,25 @@
       #${OVERLAY_ID} .gmx-btn-mini:hover:not(:disabled) {
         background: #e2e8f0;
         color: #1e293b;
+      }
+
+      #${OVERLAY_ID} .gmx-settings-panel {
+        position: absolute;
+        top: 48px; /* Below header */
+        left: 0;
+        width: 100%;
+        height: calc(100% - 48px);
+        background: rgba(255, 255, 255, 0.98);
+        z-index: 100;
+        transform: translateY(100%);
+        transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+        display: flex;
+        flex-direction: column;
+        padding: 16px;
+      }
+
+      #${OVERLAY_ID} .gmx-settings-panel.active {
+        transform: translateY(0);
       }
 
       #${OVERLAY_ID} button:disabled {
