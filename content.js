@@ -840,93 +840,209 @@
   }
 
   async function enrichWithDetails(runToken) {
-    const entries = Array.from(state.rowsMap.entries());
-    const needsEnrichment = entries.filter(([_key, row]) => !row.phone && !row.website);
-
-    if (needsEnrichment.length === 0) {
+    const container = findResultsContainer();
+    if (!container) {
       state.isRunning = false;
       state.status = `Completed. ${state.rowsMap.size} rows extracted.`;
       render();
       return;
     }
 
-    console.log(`[Overlay] Enriching ${needsEnrichment.length} places with detail data...`);
+    // Collect all listing anchors by scrolling through once
+    container.scrollTo({ top: 0, behavior: "auto" });
+    await wait(300);
+
+    const allAnchors = [];
+    const seenHrefs = new Set();
+    let stableCount = 0;
+    let lastCount = 0;
+
+    // Scroll and collect all unique listing anchors
+    while (stableCount < 3) {
+      const anchors = Array.from(container.querySelectorAll('a[href*="/maps/place/"]'));
+      for (const a of anchors) {
+        const href = a.href;
+        if (href && !seenHrefs.has(href)) {
+          seenHrefs.add(href);
+          allAnchors.push(a);
+        }
+      }
+
+      if (allAnchors.length === lastCount) {
+        stableCount++;
+      } else {
+        stableCount = 0;
+      }
+      lastCount = allAnchors.length;
+
+      const nextTop = Math.min(
+        container.scrollTop + Math.floor(container.clientHeight * 0.9),
+        container.scrollHeight
+      );
+      if (nextTop <= container.scrollTop) break;
+      container.scrollTo({ top: nextTop, behavior: "auto" });
+      await wait(100);
+    }
+
+    container.scrollTo({ top: 0, behavior: "auto" });
+    await wait(300);
+
+    const total = state.limit ? Math.min(allAnchors.length, state.limit) : allAnchors.length;
+    console.log(`[Overlay] Enriching ${total} listings with detail data...`);
 
     let enriched = 0;
-    for (const [key, row] of needsEnrichment) {
+    for (let i = 0; i < total; i++) {
       if (state.runToken !== runToken) return;
       await waitWhilePaused(runToken);
 
-      if (state.limit && enriched >= state.limit) break;
-
-      const summary = {
-        key,
-        name: row.name,
-        listing_url: row.google_maps_url || ""
-      };
-
-      state.status = `Enriching ${enriched + 1}/${needsEnrichment.length}: ${row.name}`;
+      state.status = `Enriching ${i + 1}/${total}...`;
       render();
 
       try {
-        await ensureResultsView();
-        const listingTarget = await findAndRevealListingTarget(summary, runToken);
+        // Re-find the anchor in the current DOM (it may have been recycled)
+        const currentAnchors = Array.from(container.querySelectorAll('a[href*="/maps/place/"]'));
+        const targetHref = allAnchors[i].href;
+        let anchor = currentAnchors.find(a => a.href === targetHref);
 
-        if (!listingTarget) {
-          console.warn("[Overlay] Could not find listing for enrichment:", row.name);
+        if (!anchor) {
+          // Scroll to find it
+          container.scrollTo({ top: 0, behavior: "auto" });
+          await wait(200);
+          for (let attempt = 0; attempt < 30; attempt++) {
+            const found = Array.from(container.querySelectorAll('a[href*="/maps/place/"]'))
+              .find(a => a.href === targetHref);
+            if (found) { anchor = found; break; }
+            container.scrollTo({
+              top: container.scrollTop + Math.floor(container.clientHeight * 0.8),
+              behavior: "auto"
+            });
+            await wait(100);
+          }
+        }
+
+        if (!anchor) {
+          console.warn("[Overlay] Could not find anchor for enrichment, skipping");
           continue;
         }
 
-        const opened = await openListingDetail(summary, listingTarget);
-        if (!opened) {
-          console.warn("[Overlay] Could not open detail for enrichment:", row.name);
+        // Scroll anchor into view and click
+        anchor.scrollIntoView({ block: "center", behavior: "auto" });
+        await wait(150);
+        activateElement(anchor);
+
+        // Wait for detail panel to open
+        let detailLoaded = false;
+        for (let w = 0; w < 25; w++) {
+          await wait(200);
+          const title = getPlaceTitle();
+          if (title && title !== "Results" && findBackButton()) {
+            detailLoaded = true;
+            break;
+          }
+        }
+
+        if (!detailLoaded) {
+          console.warn("[Overlay] Detail page did not load, skipping");
+          // Try to go back
+          const backBtn = findBackButton();
+          if (backBtn) activateElement(backBtn);
+          await wait(500);
           continue;
         }
 
         await wait(DETAIL_WAIT_MS);
 
-        const detailTitle = getPlaceTitle();
-        if (!detailTitle || detailTitle === "Results" || !findBackButton()) {
-          continue;
+        // Scrape the detail page
+        const name = getPlaceTitle() || "";
+        const phones = extractPhones();
+        const website = extractWebsite();
+        const openingHours = extractOpeningHours();
+        const address = extractAddress();
+        const addressParts = splitAddress(address);
+        const category = extractCategory();
+        const featuredImage = extractFeaturedImage();
+        const reviewData = extractReviewData();
+        const currentUrl = sanitizeUrl(window.location.href);
+        const identifiers = parseIdentifiers([currentUrl, targetHref]);
+        const reviewUrl = buildReviewUrl(identifiers.placeId);
+        const domain = safeDomain(website);
+
+        // Find existing row by name match or key match
+        const key = normalizeKey(targetHref);
+        let existingKey = null;
+
+        // Try exact key match first
+        if (state.rowsMap.has(key)) {
+          existingKey = key;
+        } else {
+          // Try name match
+          for (const [k, row] of state.rowsMap.entries()) {
+            if (namesRoughlyMatch(row.name, name)) {
+              existingKey = k;
+              break;
+            }
+          }
         }
 
-        // Enrich only the missing fields, keep existing data
-        const detail = scrapePlaceDetail(summary);
-        const existing = state.rowsMap.get(key);
-        if (existing) {
-          if (!existing.phone && detail.phone) existing.phone = detail.phone;
-          if (!existing.phones && detail.phones) existing.phones = detail.phones;
-          if (!existing.website && detail.website) existing.website = detail.website;
-          if (!existing.domain && detail.domain) existing.domain = detail.domain;
-          if (!existing.opening_hours && detail.opening_hours) existing.opening_hours = detail.opening_hours;
-          if (!existing.fulladdress && detail.fulladdress) existing.fulladdress = detail.fulladdress;
-          if (!existing.street && detail.street) existing.street = detail.street;
-          if (!existing.municipality && detail.municipality) existing.municipality = detail.municipality;
-          if (!existing.categories && detail.categories) existing.categories = detail.categories;
-          if (!existing.review_url && detail.review_url) existing.review_url = detail.review_url;
-          if (!existing.place_id && detail.place_id) existing.place_id = detail.place_id;
-          if (!existing.featured_image && detail.featured_image) existing.featured_image = detail.featured_image;
-          if (!existing.cid && detail.cid) existing.cid = detail.cid;
-          if (!existing.fid && detail.fid) existing.fid = detail.fid;
-          state.rowsMap.set(key, existing);
+        if (existingKey) {
+          // Merge enriched data into existing row
+          const existing = state.rowsMap.get(existingKey);
+          if (phones[0]) { existing.phone = phones[0]; existing.phones = formatPhones(phones); }
+          if (website) { existing.website = website; existing.domain = domain; }
+          if (openingHours) existing.opening_hours = openingHours;
+          if (address) { existing.fulladdress = address; existing.street = addressParts.street; existing.municipality = addressParts.municipality; }
+          if (category) existing.categories = category;
+          if (featuredImage) existing.featured_image = featuredImage;
+          if (reviewData.reviewCount) existing.review_count = reviewData.reviewCount;
+          if (reviewData.averageRating) existing.average_rating = reviewData.averageRating;
+          if (reviewUrl) existing.review_url = reviewUrl;
+          if (identifiers.placeId) existing.place_id = identifiers.placeId;
+          if (identifiers.cid) existing.cid = identifiers.cid;
+          if (identifiers.fid) existing.fid = identifiers.fid;
+          state.rowsMap.set(existingKey, existing);
+        } else {
+          // New entry
+          const claimed = /\bclaimed\b/i.test(normalizeWhitespace(document.body.innerText)) ? "YES" : "";
+          state.rowsMap.set(key, {
+            name, description: "", fulladdress: address, street: addressParts.street,
+            municipality: addressParts.municipality, categories: category,
+            time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
+            amenities: "", phone: phones[0] || "", phones: formatPhones(phones),
+            claimed, review_count: reviewData.reviewCount, average_rating: reviewData.averageRating,
+            review_url: reviewUrl, google_maps_url: currentUrl,
+            latitude: identifiers.latitude, longitude: identifiers.longitude,
+            website, domain, opening_hours: openingHours, featured_image: featuredImage,
+            cid: identifiers.cid, fid: identifiers.fid, place_id: identifiers.placeId
+          });
         }
 
         enriched++;
+        state.extractedTotal = state.rowsMap.size;
         render();
       } catch (error) {
-        console.warn("[Overlay] Enrichment failed for:", row.name, error);
+        console.warn("[Overlay] Enrichment error:", error);
       } finally {
+        // Navigate back to results
         try {
-          await navigateBackToResults();
+          const backBtn = findBackButton();
+          if (backBtn) {
+            activateElement(backBtn);
+            await wait(500);
+            // Wait for results to reappear
+            for (let w = 0; w < 20; w++) {
+              if (findResultsContainer() && !isPlaceDetailOpen()) break;
+              await wait(200);
+            }
+          }
         } catch (navErr) {
-          console.warn("[Overlay] Failed to return to results:", navErr);
+          console.warn("[Overlay] Nav back error:", navErr);
         }
       }
     }
 
     state.isRunning = false;
     state.isPaused = false;
-    state.status = `Completed. ${state.rowsMap.size} rows extracted (${enriched} enriched).`;
+    state.status = `Completed. ${state.rowsMap.size} rows (${enriched} enriched with details).`;
     render();
   }
 
